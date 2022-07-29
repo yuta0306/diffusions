@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "diffusions"
+version = "0.1.0"
+description = "Diffusion models"
+authors = ["Your Name <you@example.com>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.8,<4.0"
+torch = "^1.12.0"
+numpy = "^1.23.1"
+einops = "^0.4.1"
+
+[tool.poetry.dev-dependencies]
+black = "^22.6.0"
+isort = "^5.10.1"
+mypy = "^0.971"
+flake8 = "^4.0.1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
