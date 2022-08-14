@@ -1,5 +1,4 @@
-from cgitb import reset
-from typing import Any, Optional
+from typing import Any, Optional, Type, Union
 
 import torch
 import torch.nn as nn
@@ -67,6 +66,9 @@ class Downsample2D(nn.Module):
 
 
 class ResnetBlock(nn.Module):
+
+    nonlinearity: Union[Swish, nn.SiLU, nn.Mish]
+
     def __init__(
         self,
         *,
@@ -79,7 +81,7 @@ class ResnetBlock(nn.Module):
         groups_out: Optional[int] = None,
         pre_norm: bool = False,
         eps: float = 1e-6,
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         time_embedding_norm: str = "default",
         kernel: Optional[str] = None,
         output_scale_factor: float = 1.0,
@@ -209,7 +211,7 @@ class ResnetBlock(nn.Module):
         self.conv1.bias.data = resnet.conv1.bias.data
 
         if self.time_emb_proj is not None:
-            self.time_emb_proj.weight.data = reset.temb_proj.weight.data
+            self.time_emb_proj.weight.data = resnet.temb_proj.weight.data
             self.time_emb_proj.bias.data = resnet.temb_proj.bias.data
 
         self.norm2.weight.data = resnet.norm2.weight.data

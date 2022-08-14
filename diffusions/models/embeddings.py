@@ -1,9 +1,10 @@
-from typing import Any, Union
+from typing import Type, Union
 
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from diffusions.models.activation import Swish
 
 
 class TimestepEmbedding(nn.Module):
@@ -12,7 +13,7 @@ class TimestepEmbedding(nn.Module):
         *,
         channel: int,
         dim: int,
-        activation: Union[Any, None] = nn.SiLU,
+        activation: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish], None] = nn.SiLU,
         **factory_kwargs,
     ) -> None:
         super(TimestepEmbedding, self).__init__()

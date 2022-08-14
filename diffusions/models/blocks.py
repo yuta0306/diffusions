@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple, Type, Union
 
 import torch
 import torch.nn as nn
@@ -16,7 +16,7 @@ class UNetMidBlock(nn.Module):
         num_layers: int = 1,
         eps: float = 1e-6,
         time_scale_shift: str = "default",
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 32,
         pre_norm: bool = True,
         num_head_channels: int = 1,
@@ -82,7 +82,7 @@ class UNetMidCrossAttentionBlock(nn.Module):
         num_layers: int = 1,
         eps: float = 1e-6,
         time_scale_shift: str = "default",
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 32,
         pre_norm: bool = True,
         num_head_channels: int = 1,
@@ -147,7 +147,7 @@ class DownBlock(nn.Module):
         num_layers: int = 1,
         eps: float = 1e-6,
         time_scale_shift: str = "default",
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 32,
         pre_norm: bool = True,
         output_scale_factor: float = 1.0,
@@ -217,7 +217,7 @@ class AttnDownBlock(nn.Module):
         num_layers: int = 1,
         eps: float = 1e-6,
         time_scale_shift: str = "default",
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 32,
         pre_norm: bool = True,
         num_head_channels: int = 1,
@@ -301,7 +301,7 @@ class UpBlock(nn.Module):
         num_layers: int = 1,
         eps: float = 1e-6,
         time_scale_shift: str = "default",
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 32,
         pre_norm: bool = True,
         output_scale_factor: float = 1.0,
@@ -378,7 +378,7 @@ class AttnUpBlock(nn.Module):
         num_layers: int = 1,
         eps: float = 1e-6,
         time_scale_shift: str = "default",
-        non_linearity: Any = Swish,
+        non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 32,
         pre_norm: bool = True,
         num_head_channels: int = 1,
