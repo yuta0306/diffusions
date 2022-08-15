@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 
 import torch
 import torch.nn as nn
@@ -10,6 +10,8 @@ class Swish(nn.Module):
 
     when beta is 1, this function is the same as SiLU
     """
+
+    beta: Union[nn.Parameter, float]
 
     def __init__(self, beta: Optional[float] = None) -> None:
         """Swish

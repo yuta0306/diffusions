@@ -7,7 +7,56 @@ import torch.nn.functional as F
 from einops import rearrange
 
 
+class FeedForward(nn.Module):
+    def __init__(
+        self,
+        dim: int,
+        dim_out: Optional[int] = None,
+        mult: int = 4,
+        glu: bool = False,
+        dropout: float = 0.0,
+    ) -> None:
+        super(FeedForward, self).__init__()
+
+        inner_dim = int(dim * mult)
+        dim_out = dim if dim_out is None else dim_out
+        in_proj = (
+            nn.Sequential(nn.Linear(dim, inner_dim), nn.GELU())
+            if not glu
+            else GEGLU(dim, inner_dim)
+        )
+
+        self.net = nn.Sequential(
+            in_proj,
+            nn.Dropout(dropout),
+            nn.Linear(inner_dim, dim_out),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+class GEGLU(nn.Module):
+    def __init__(self, dim_in: int, dim_out: int) -> None:
+        super(GEGLU, self).__init__()
+        self.proj = nn.Linear(dim_in, dim_out * 2)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x, gate = self.proj(x).chunk(2, dim=-1)
+        return x * F.gelu(gate)
+
+
 class AttentionBlock(nn.Module):
+
+    channels: int
+    num_heads: int
+    n_heads: int
+    rescale_output_factor: float
+    norm: nn.GroupNorm
+    qkv: nn.Conv1d
+    encoder_kv: nn.Conv1d
+    proj: nn.Conv1d
+
     def __init__(
         self,
         channels: int,
@@ -73,6 +122,14 @@ class AttentionBlock(nn.Module):
 
 
 class CrossAttention(nn.Module):
+
+    heads: int
+    scale: float
+    q_proj: nn.Linear
+    k_proj: nn.Linear
+    v_proj: nn.Linear
+    out_proj: nn.Sequential
+
     def __init__(
         self,
         query_dim: int,
@@ -133,6 +190,15 @@ class CrossAttention(nn.Module):
 
 
 class SpatialTransformer(nn.Module):
+
+    n_heads: int
+    d_head: int
+    in_channels: int
+    norm: nn.GroupNorm
+    in_proj: nn.Conv2d
+    transformer_blocks: nn.ModuleList
+    out_proj: nn.Conv2d
+
     def __init__(
         self,
         in_channels: int,
@@ -193,6 +259,15 @@ class SpatialTransformer(nn.Module):
 
 
 class TransformerBlock(nn.Module):
+
+    checkpoint: bool
+    attn_1: CrossAttention
+    ff: FeedForward
+    attn_2: CrossAttention
+    norm_1: nn.LayerNorm
+    norm_2: nn.LayerNorm
+    norm_3: nn.LayerNorm
+
     def __init__(
         self,
         dim: int,
@@ -233,42 +308,3 @@ class TransformerBlock(nn.Module):
         x = self.attn_2(self.norm_2(x), context=context) + x
         out = self.ff(self.norm_3(x)) + x
         return out
-
-
-class FeedForward(nn.Module):
-    def __init__(
-        self,
-        dim: int,
-        dim_out: Optional[int] = None,
-        mult: int = 4,
-        glu: bool = False,
-        dropout: float = 0.0,
-    ) -> None:
-        super(FeedForward, self).__init__()
-
-        inner_dim = int(dim * mult)
-        dim_out = dim if dim_out is None else dim_out
-        in_proj = (
-            nn.Sequential(nn.Linear(dim, inner_dim), nn.GELU())
-            if not glu
-            else GEGLU(dim, inner_dim)
-        )
-
-        self.net = nn.Sequential(
-            in_proj,
-            nn.Dropout(dropout),
-            nn.Linear(inner_dim, dim_out),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.net(x)
-
-
-class GEGLU(nn.Module):
-    def __init__(self, dim_in: int, dim_out: int) -> None:
-        super(GEGLU, self).__init__()
-        self.proj = nn.Linear(dim_in, dim_out * 2)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x, gate = self.proj(x).chunk(2, dim=-1)
-        return x * F.gelu(gate)
