@@ -30,7 +30,7 @@ class Upsample2D(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        assert x.size(1) == self.channels
+        assert x.size(1) == self.channels, f"{x.size(1)} != {self.channels}"
         out = self.conv(x)
         return out
 
@@ -60,7 +60,7 @@ class Downsample2D(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        assert x.size(1) == self.channels
+        assert x.size(1) == self.channels, f"{x.size(1)} != {self.channels}"
         out = self.conv(x)
         return out
 
