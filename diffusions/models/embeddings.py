@@ -60,7 +60,7 @@ class Timesteps(nn.Module):
         coeff = -np.log(self.max_period) / (half_dim - self.downscale_freq_shift)
         emb = torch.arange(half_dim, dtype=torch.float32, device=timesteps.device)
         emb = torch.exp(emb * coeff)
-        emb = timesteps[:, ...].float() * emb[..., :]
+        emb = timesteps[:, None].float() * emb[None, :]
 
         emb = self.scale * emb
 
