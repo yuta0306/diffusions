@@ -189,22 +189,22 @@ class DownBlock(nn.Module):
 
     def forward(
         self,
-        hidden_state: torch.Tensor,
+        hidden_states: torch.Tensor,
         temb: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
         states: Tuple[torch.Tensor, ...] = ()
 
         for resnet in self.resnets:
-            hidden_state = resnet(hidden_state, temb)
-            states += (hidden_state,)
+            hidden_states = resnet(hidden_states, temb)
+            states += (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
-                hidden_state = downsampler(hidden_state)
+                hidden_states = downsampler(hidden_states)
 
-            states += (hidden_state,)
+            states += (hidden_states,)
 
-        return hidden_state, states
+        return hidden_states, states
 
 
 class AttnDownBlock(nn.Module):

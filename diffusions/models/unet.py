@@ -188,7 +188,7 @@ class UNet(nn.Module):
         # downsampling
         res_samples = (sample,)
         for down_block in self.down_blocks:
-            sample, res = down_block(hidden_state=sample, temb=emb)
+            sample, res = down_block(hidden_states=sample, temb=emb)
         res_samples += res
 
         # mid
