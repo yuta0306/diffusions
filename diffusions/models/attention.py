@@ -89,7 +89,7 @@ class AttentionBlock(nn.Module):
 
         self.proj = nn.Conv1d(channels, channels, 1)
 
-    def forward(self, x, encoder_out: bool = False):
+    def forward(self, x: torch.Tensor, encoder_out: Optional[torch.Tensor] = None):
         B, C, *spatial = x.size()
         hidden_states = self.norm(x).view(B, C, -1)
 
@@ -245,7 +245,11 @@ class SpatialTransformer(nn.Module):
             padding=0,
         )
 
-    def forward(self, x: torch.Tensor, context: Optional[torch.Tensor]) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        context: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         x_in = x
         x = self.norm(x)
         x = self.in_proj(x)
