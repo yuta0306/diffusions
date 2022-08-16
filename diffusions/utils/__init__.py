@@ -1,3 +1,3 @@
-from ema import EMAModel
+from .ema import EMAModel
 
 __all__ = ["EMAModel"]
