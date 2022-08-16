@@ -57,6 +57,8 @@ class UNet(nn.Module):
     ) -> None:
         super(UNet, self).__init__()
 
+        self.in_channels = in_channels
+        self.out_channels = out_channels
         self.sample_size = sample_size
         time_embed_dim = block_out_channels[0] * 4
 
