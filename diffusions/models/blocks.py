@@ -310,32 +310,26 @@ class UpBlock(nn.Module):
     ) -> None:
         super(UpBlock, self).__init__()
 
-        skip_channels_list = [
-            in_channels if i == num_layers - 1 else out_channels
-            for i in range(num_layers)
-        ]
-        in_channels_list = [
-            prev_channels if i == 0 else out_channels for i in range(num_layers)
-        ]
+        resnets = []
+        for i in range(num_layers):
+            skip_channels = in_channels if (i == num_layers - 1) else out_channels
+            in_channels = prev_channels if i == 0 else out_channels
 
-        resnets = [
-            ResnetBlock(
-                in_channels=in_channels + skip_channels,
-                out_channels=out_channels,
-                temb_channels=temb_channels,
-                eps=eps,
-                groups=groups,
-                dropout=dropout,
-                time_embedding_norm=time_scale_shift,
-                non_linearity=non_linearity,
-                output_scale_factor=output_scale_factor,
-                pre_norm=pre_norm,
-                **factory_kwargs,
+            resnets.append(
+                ResnetBlock(
+                    in_channels=in_channels + skip_channels,
+                    out_channels=out_channels,
+                    temb_channels=temb_channels,
+                    eps=eps,
+                    groups=groups,
+                    dropout=dropout,
+                    time_embedding_norm=time_scale_shift,
+                    non_linearity=non_linearity,
+                    output_scale_factor=output_scale_factor,
+                    pre_norm=pre_norm,
+                    **factory_kwargs,
+                )
             )
-            for i, (skip_channels, in_channels) in enumerate(
-                zip(skip_channels_list, in_channels_list)
-            )
-        ]
 
         self.resnets = nn.ModuleList(resnets)
 
@@ -388,41 +382,34 @@ class AttnUpBlock(nn.Module):
     ) -> None:
         super(AttnUpBlock, self).__init__()
 
-        skip_channels_list = [
-            in_channels if i == num_layers - 1 else out_channels
-            for i in range(num_layers)
-        ]
-        in_channels_list = [
-            prev_channels if i == 0 else out_channels for i in range(num_layers)
-        ]
+        resnets = []
+        attentions = []
+        for i in range(num_layers):
 
-        resnets = [
-            ResnetBlock(
-                in_channels=in_channels + skip_channels,
-                out_channels=out_channels,
-                temb_channels=temb_channels,
-                eps=eps,
-                groups=groups,
-                dropout=dropout,
-                time_embedding_norm=time_scale_shift,
-                non_linearity=non_linearity,
-                output_scale_factor=output_scale_factor,
-                pre_norm=pre_norm,
-                **factory_kwargs,
+            resnets.append(
+                ResnetBlock(
+                    in_channels=(prev_channels if i == 0 else out_channels)
+                    + (in_channels if (i == num_layers - 1) else out_channels),
+                    out_channels=out_channels,
+                    temb_channels=temb_channels,
+                    eps=eps,
+                    groups=groups,
+                    dropout=dropout,
+                    time_embedding_norm=time_scale_shift,
+                    non_linearity=non_linearity,
+                    output_scale_factor=output_scale_factor,
+                    pre_norm=pre_norm,
+                    **factory_kwargs,
+                )
             )
-            for i, (skip_channels, in_channels) in enumerate(
-                zip(skip_channels_list, in_channels_list)
+            attentions.append(
+                AttentionBlock(
+                    channels=out_channels,
+                    num_head_channels=num_head_channels,
+                    rescale_output_factor=output_scale_factor,
+                    eps=eps,
+                )
             )
-        ]
-        attentions = [
-            AttentionBlock(
-                channels=out_channels,
-                num_head_channels=num_head_channels,
-                rescale_output_factor=output_scale_factor,
-                eps=eps,
-            )
-            for _ in range(num_layers)
-        ]
 
         self.resnets = nn.ModuleList(resnets)
         self.attentions = nn.ModuleList(attentions)

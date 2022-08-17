@@ -3,10 +3,18 @@ from typing import Dict, Optional, Tuple, Type, Union
 import torch
 import torch.nn as nn
 from diffusions.models.activation import Swish
-from diffusions.models.blocks import (AttnDownBlock, AttnUpBlock, DownBlock,
-                                      UNetMidBlock, UpBlock)
-from diffusions.models.embeddings import (GaussianFourierProjection,
-                                          TimestepEmbedding, Timesteps)
+from diffusions.models.blocks import (
+    AttnDownBlock,
+    AttnUpBlock,
+    DownBlock,
+    UNetMidBlock,
+    UpBlock,
+)
+from diffusions.models.embeddings import (
+    GaussianFourierProjection,
+    TimestepEmbedding,
+    Timesteps,
+)
 
 
 class UNet(nn.Module):
@@ -214,7 +222,7 @@ class UNet(nn.Module):
 
 
 if __name__ == "__main__":
-    inp = torch.randn(2, 3, 64, 64)
+    inp = torch.randn(2, 3, 128, 128)
     timesteps = torch.randint(
         0,
         1000,
@@ -222,28 +230,29 @@ if __name__ == "__main__":
         device=inp.device,
     ).long()
     model = UNet(
-        sample_size=64,
+        sample_size=128,
         in_channels=3,
         out_channels=3,
         layers_per_block=2,
-        block_out_channels=(64, 64, 128, 128, 256, 256),
+        block_out_channels=(128, 128, 256, 256, 512, 512),
         down_block_types=(
             DownBlock,
-            AttnDownBlock,
-            AttnDownBlock,
-            AttnDownBlock,
+            DownBlock,
+            DownBlock,
+            DownBlock,
             AttnDownBlock,
             DownBlock,
         ),
         up_block_types=(
             UpBlock,
             AttnUpBlock,
-            AttnUpBlock,
-            AttnUpBlock,
-            AttnUpBlock,
+            UpBlock,
+            UpBlock,
+            UpBlock,
             UpBlock,
         ),
     )
+    print(model)
 
     out = model(inp, timestep=timesteps)
     print(out)
