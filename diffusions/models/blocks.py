@@ -445,7 +445,9 @@ class AttnUpBlock(nn.Module):
         temb: Optional[torch.Tensor],
     ) -> torch.Tensor:
         for attn, resnet in zip(self.attentions, self.resnets):
-            hidden_states = torch.cat([hidden_states, res_hidden_states[-1]], dim=1)
+            res_states = res_hidden_states[-1]
+            res_hidden_states = res_hidden_states[:-1]
+            hidden_states = torch.cat([hidden_states, res_states], dim=1)
             hidden_states = resnet(hidden_states, temb)
             hidden_states = attn(hidden_states)
 

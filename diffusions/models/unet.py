@@ -189,21 +189,26 @@ class UNet(nn.Module):
         sample = self.conv_in(sample)
 
         # downsampling
-        res_samples = (sample,)
+        res_samples: Tuple[torch.Tensor, ...] = (sample,)
         for down_block in self.down_blocks:
             sample, res = down_block(hidden_states=sample, temb=emb)
-        res_samples += res
+            res_samples += res
 
         # mid
         sample = self.mid_block(sample, emb)
 
         # upsampling
+        down_block_res_samples = res_samples
         for up_block in self.up_blocks:
+            res_samples = down_block_res_samples[-len(up_block.resnets) :]
+            down_block_res_samples = down_block_res_samples[: -len(up_block.resnets)]
+            print("call up_block")
             sample = up_block(
                 sample,
-                res_samples[-len(up_block.resnets) :],
+                res_samples,
                 emb,
             )
+            print(sample.size())
 
         # postprocessing
         sample = self.conv_norm_out(sample)
@@ -216,3 +221,39 @@ class UNet(nn.Module):
             )
 
         return {"sample": sample}
+
+
+if __name__ == "__main__":
+    inp = torch.randn(2, 3, 64, 64)
+    timesteps = torch.randint(
+        0,
+        1000,
+        (inp.size(0),),
+        device=inp.device,
+    ).long()
+    model = UNet(
+        sample_size=64,
+        in_channels=3,
+        out_channels=3,
+        layers_per_block=2,
+        block_out_channels=(64, 64, 128, 128, 256, 256),
+        down_block_types=(
+            DownBlock,
+            AttnDownBlock,
+            AttnDownBlock,
+            AttnDownBlock,
+            AttnDownBlock,
+            DownBlock,
+        ),
+        up_block_types=(
+            UpBlock,
+            AttnUpBlock,
+            AttnUpBlock,
+            AttnUpBlock,
+            AttnUpBlock,
+            UpBlock,
+        ),
+    )
+
+    out = model(inp, timestep=timesteps)
+    print(out)
