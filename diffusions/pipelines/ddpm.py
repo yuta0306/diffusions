@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from diffusions.models import UNet
 from diffusions.schedulers import DDPM
+from tqdm.auto import tqdm
 
 
 class DDPMPipeline(nn.Module):
@@ -40,7 +41,7 @@ class DDPMPipeline(nn.Module):
 
         self.scheduler.set_timesteps(num_inference_steps=timesteps)
 
-        for t in range(self.scheduler.timesteps):
+        for t in tqdm(self.scheduler.timesteps):
             model_output = self.unet(images, t)["sample"]
 
             images = self.scheduler.step(
