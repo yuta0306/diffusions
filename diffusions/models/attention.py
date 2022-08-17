@@ -123,7 +123,9 @@ class AttentionBlock(nn.Module):
         hidden_states = einops.rearrange(
             hidden_states, "b (h w) c -> b c h w", c=C, h=H, w=W
         )
-        assert hidden_states.size() == residual.size()
+        assert (
+            hidden_states.size() == residual.size()
+        ), f"{hidden_states.size()} != {residual.size()}"
 
         # residual connection
         hidden_states = (hidden_states + residual) / self.rescale_output_factor
