@@ -3,18 +3,10 @@ from typing import Dict, Optional, Tuple, Type, Union
 import torch
 import torch.nn as nn
 from diffusions.models.activation import Swish
-from diffusions.models.blocks import (
-    AttnDownBlock,
-    AttnUpBlock,
-    DownBlock,
-    UNetMidBlock,
-    UpBlock,
-)
-from diffusions.models.embeddings import (
-    GaussianFourierProjection,
-    TimestepEmbedding,
-    Timesteps,
-)
+from diffusions.models.blocks import (AttnDownBlock, AttnUpBlock, DownBlock,
+                                      UNetMidBlock, UpBlock)
+from diffusions.models.embeddings import (GaussianFourierProjection,
+                                          TimestepEmbedding, Timesteps)
 
 
 class UNet(nn.Module):
@@ -202,13 +194,11 @@ class UNet(nn.Module):
         for up_block in self.up_blocks:
             res_samples = down_block_res_samples[-len(up_block.resnets) :]
             down_block_res_samples = down_block_res_samples[: -len(up_block.resnets)]
-            print("call up_block")
             sample = up_block(
                 sample,
                 res_samples,
                 emb,
             )
-            print(sample.size())
 
         # postprocessing
         sample = self.conv_norm_out(sample)
