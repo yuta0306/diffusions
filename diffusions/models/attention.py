@@ -53,9 +53,10 @@ class AttentionBlock(nn.Module):
     num_heads: int
     rescale_output_factor: float
     norm: nn.GroupNorm
-    qkv: nn.Conv1d
-    encoder_kv: nn.Conv1d
-    proj: nn.Conv1d
+    q_proj: nn.Linear
+    k_proj: nn.Linear
+    v_proj: nn.Linear
+    o_proj: nn.Linear
 
     def __init__(
         self,
@@ -104,16 +105,27 @@ class AttentionBlock(nn.Module):
 
         # attention score
         scale = 1 / math.sqrt(math.sqrt(self.channels / self.num_heads))
-        attention_scores = torch.einsum("bhid, bhjd -> bhij", query, key) * scale
+        attention_scores = (
+            torch.einsum("bhid, bhjd -> bhij", query, key) * scale
+        )  # i = j = t
         attention_probs = F.softmax(attention_scores.float(), dim=-1).type(
             attention_scores.dtype
         )
 
         # attention output
-        context_states = torch.einsum("bhij, bhjd -> bhid", attention_probs, value)
+        context_states = torch.einsum(
+            "bhij, bhjd -> bhid", attention_probs, value
+        )  # i = j = t
+        assert context_states.size() == (B, self.num_heads, H * W, self.channels)
 
+        # bhid = bhtd -> bt(hd) = b(hw)c  -porj-> b(hw)c -> bchw
+        context_states = einops.rearrange(context_states, "b h t d -> b t (h d)")
         hidden_states = self.o_proj(context_states)
-        hidden_states = einops.rearrange(hidden_states, "b h i d -> b i (h d)")
+        assert hidden_states.size() == (B, H * W, self.num_heads * C)
+        hidden_states = einops.rearrange(
+            hidden_states, "b (h w) c -> b c h w", c=C, h=H, w=W
+        )
+        assert hidden_states.size() == residual.size()
 
         # residual connection
         hidden_states = (hidden_states + residual) / self.rescale_output_factor
@@ -186,7 +198,7 @@ class CrossAttention(nn.Module):
 
         out = torch.einsum("bhij, bhjd -> bhid", attention_weights, value)
         out = rearrange(out, "bhid -> bi(hd)")
-        return out
+        return self.out_proj(out)
 
 
 class SpatialTransformer(nn.Module):
@@ -312,3 +324,9 @@ class TransformerBlock(nn.Module):
         x = self.attn_2(self.norm_2(x), context=context) + x
         out = self.ff(self.norm_3(x)) + x
         return out
+
+
+if __name__ == "__main__":
+    inp = torch.randn((2, 64, 128, 128))
+    model = AttentionBlock(64)
+    out = model(inp)
