@@ -1,6 +1,7 @@
+import math
 from typing import Optional
 
-import numpy as np
+import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -50,7 +51,6 @@ class AttentionBlock(nn.Module):
 
     channels: int
     num_heads: int
-    n_heads: int
     rescale_output_factor: float
     norm: nn.GroupNorm
     qkv: nn.Conv1d
@@ -60,65 +60,65 @@ class AttentionBlock(nn.Module):
     def __init__(
         self,
         channels: int,
-        num_heads: int = 1,
         num_head_channels: Optional[int] = None,
         num_groups: int = 32,
-        encoder_channels: Optional[int] = None,
         rescale_output_factor: float = 1.0,
         eps: float = 1e-5,
     ):
-        super().__init__()
+        super(AttentionBlock, self).__init__()
         self.channels = channels
-        if num_head_channels is None:
-            self.num_heads = num_heads
-        else:
-            assert (
-                channels % num_head_channels == 0
-            ), f"q,k,v channels {channels} is not divisible by num_head_channels {num_head_channels}"
-            self.num_heads = channels // num_head_channels
 
+        self.num_heads = (
+            channels // num_head_channels if num_head_channels is not None else 1
+        )
         self.norm = nn.GroupNorm(
             num_channels=channels, num_groups=num_groups, eps=eps, affine=True
         )
-        self.qkv = nn.Conv1d(channels, channels * 3, 1)
-        self.n_heads = self.num_heads
+
+        # q, k, v projection
+        self.q_proj = nn.Linear(channels, channels)
+        self.k_proj = nn.Linear(channels, channels)
+        self.v_proj = nn.Linear(channels, channels)
+
         self.rescale_output_factor = rescale_output_factor
+        self.o_proj = nn.Linear(channels, channels)
 
-        if encoder_channels is not None:
-            self.encoder_kv = nn.Conv1d(encoder_channels, channels * 2, 1)
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        residual = hidden_states
+        B, C, H, W = hidden_states.size()
 
-        self.proj = nn.Conv1d(channels, channels, 1)
+        # norm
+        hidden_states = self.norm(hidden_states)
+        hidden_states = einops.rearrange(hidden_states, "b c h w -> b (h w) c")
+        assert hidden_states.size() == (B, H * W, C), hidden_states.size()
 
-    def forward(self, x: torch.Tensor, encoder_out: Optional[torch.Tensor] = None):
-        B, C, *spatial = x.size()
-        hidden_states = self.norm(x).view(B, C, -1)
+        # proj to q, k, v
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
 
-        qkv = self.qkv(hidden_states)
-        bs, width, length = qkv.size()
-        assert width % (3 * self.n_heads) == 0
-        ch = width // (3 * self.n_heads)
-        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch, dim=1)
+        # split heads
+        query = einops.rearrange(query, "b t (h d) -> b h t d", h=self.num_heads)
+        key = einops.rearrange(key, "b t (h d) -> b h t d", h=self.num_heads)
+        value = einops.rearrange(value, "b t (h d) -> b h t d", h=self.num_heads)
 
-        if encoder_out is not None:
-            encoder_kv = self.encoder_kv(encoder_out)
-            ek, ev = encoder_kv.reshape(bs * self.n_heads, ch * 2, -1).split(ch, dim=1)
-            k = torch.cat([ek, k], dim=-1)
-            v = torch.cat([ev, v], dim=-1)
+        # attention score
+        scale = 1 / math.sqrt(math.sqrt(self.channels / self.num_heads))
+        attention_scores = torch.einsum("bhid, bhjd -> bhij", query, key) * scale
+        attention_probs = F.softmax(attention_scores.float(), dim=-1).type(
+            attention_scores.dtype
+        )
 
-        scale = 1 / np.sqrt(np.sqrt(ch))
-        weight = torch.einsum("bct, bcs -> bts", q * scale, k * scale)
-        weight = torch.softmax(weight.float(), dim=-1).type(weight.dtype)
+        # attention output
+        context_states = torch.einsum("bhij, bhjd -> bhid", attention_probs, value)
 
-        a = torch.einsum("bts, bcs -> bct", weight, v)
-        h = a.reshape(bs, -1, length)
+        hidden_states = self.o_proj(context_states)
+        hidden_states = einops.rearrange(hidden_states, "b h i d -> b i (h d)")
 
-        h = self.proj(h)
-        h = h.reshape(B, C, *spatial)
+        # residual connection
+        hidden_states = (hidden_states + residual) / self.rescale_output_factor
 
-        out = x + h
-        out = out / self.rescale_output_factor
-
-        return out
+        return hidden_states
 
 
 class CrossAttention(nn.Module):

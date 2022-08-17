@@ -178,7 +178,7 @@ class UNet(nn.Module):
         # time
         if isinstance(timestep, torch.Tensor):
             timesteps = timestep
-        if not torch.is_tensor(timestep):
+        else:
             timesteps = torch.tensor([timestep], dtype=torch.long, device=sample.device)
 
         t_emb = self.time_proj(timesteps)
