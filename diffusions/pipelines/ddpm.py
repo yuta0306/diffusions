@@ -49,6 +49,7 @@ class DDPMPipeline(nn.Module):
             )["prev_sample"]
 
         images = (images / 2 + 0.5).clamp(0, 1)
+        images = images.cpu()
 
         return {"sample": images}
 
