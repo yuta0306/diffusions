@@ -180,7 +180,7 @@ class DownBlock(nn.Module):
             self.downsamplers = nn.ModuleList(
                 [
                     Downsample2D(
-                        channels=in_channels,
+                        channels=out_channels if num_layers > 1 else in_channels,
                         out_channels=out_channels,
                         padding=downsample_padding,
                     )
@@ -262,7 +262,7 @@ class AttnDownBlock(nn.Module):
             self.downsamplers = nn.ModuleList(
                 [
                     Downsample2D(
-                        channels=in_channels,
+                        channels=out_channels if num_layers > 1 else in_channels,
                         out_channels=out_channels,
                         padding=downsample_padding,
                     )

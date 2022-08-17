@@ -93,6 +93,7 @@ class UNet(nn.Module):
         for i, down_block_type in enumerate(down_block_types):
             in_channel = out_channel
             out_channel = block_out_channels[i]
+            is_final_block = i == len(block_out_channels) - 1
 
             down_blocks.append(
                 down_block_type(
@@ -103,7 +104,7 @@ class UNet(nn.Module):
                     eps=eps,
                     non_linearity=non_linearity,
                     num_head_channels=head_dim,
-                    add_downsample=not (i == len(block_out_channels) - 1),
+                    add_downsample=not is_final_block,
                     downsample_padding=downsample_padding,
                     **factory_kwargs,
                 )
