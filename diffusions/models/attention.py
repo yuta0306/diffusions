@@ -116,12 +116,10 @@ class AttentionBlock(nn.Module):
         context_states = torch.einsum(
             "bhij, bhjd -> bhid", attention_probs, value
         )  # i = j = t
-        assert context_states.size() == (B, self.num_heads, H * W, self.channels)
 
         # bhid = bhtd -> bt(hd) = b(hw)c  -porj-> b(hw)c -> bchw
         context_states = einops.rearrange(context_states, "b h t d -> b t (h d)")
         hidden_states = self.o_proj(context_states)
-        assert hidden_states.size() == (B, H * W, self.num_heads * C)
         hidden_states = einops.rearrange(
             hidden_states, "b (h w) c -> b c h w", c=C, h=H, w=W
         )
