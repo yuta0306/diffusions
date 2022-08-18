@@ -46,7 +46,7 @@ class UNet(nn.Module):
             AttnUpBlock,
         ),
         block_out_channels: Tuple[int, ...] = (224, 448, 672, 896),
-        layers_per_block: int = 2,
+        layers_per_block: Union[int, Tuple[int, ...]] = 2,
         mid_block_scale_factor: int = 1,
         downsample_padding: int = 1,
         non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
@@ -87,6 +87,11 @@ class UNet(nn.Module):
             channel=timestep_dim, dim=time_embed_dim
         )
 
+        if isinstance(layers_per_block, int):
+            self.layers_per_block = (layers_per_block,) * len(block_out_channels)
+        else:
+            self.layers_per_block = layers_per_block
+
         # downsampling
         down_blocks = []
         out_channel = block_out_channels[0]
@@ -100,7 +105,7 @@ class UNet(nn.Module):
                     in_channels=in_channel,
                     out_channels=out_channel,
                     temb_channels=time_embed_dim,
-                    num_layers=layers_per_block,
+                    num_layers=self.layers_per_block[i],
                     eps=eps,
                     non_linearity=non_linearity,
                     num_head_channels=head_dim,
@@ -127,6 +132,7 @@ class UNet(nn.Module):
         # upsampling
         up_blocks = []
         reversed_block_out_channels = list(reversed(block_out_channels))
+        reversed_layers_per_block = tuple(reversed(self.layers_per_block))
         out_channel = reversed_block_out_channels[0]
         for i, up_block_type in enumerate(up_block_types):
             prev_channel = out_channel
@@ -141,7 +147,7 @@ class UNet(nn.Module):
                     out_channels=out_channel,
                     prev_channels=prev_channel,
                     temb_channels=time_embed_dim,
-                    num_layers=layers_per_block + 1,
+                    num_layers=reversed_layers_per_block[i] + 1,
                     eps=eps,
                     non_linearity=non_linearity,
                     num_head_channels=head_dim,
@@ -230,25 +236,21 @@ if __name__ == "__main__":
         device=inp.device,
     ).long()
     model = UNet(
-        sample_size=128,
+        sample_size=64,
         in_channels=3,
         out_channels=3,
-        layers_per_block=2,
-        block_out_channels=(128, 128, 256, 256, 512, 512),
+        layers_per_block=3,
+        block_out_channels=(32, 64, 128, 256),
         down_block_types=(
             DownBlock,
-            DownBlock,
-            DownBlock,
-            DownBlock,
             AttnDownBlock,
-            DownBlock,
+            AttnDownBlock,
+            AttnDownBlock,
         ),
         up_block_types=(
-            UpBlock,
             AttnUpBlock,
-            UpBlock,
-            UpBlock,
-            UpBlock,
+            AttnUpBlock,
+            AttnUpBlock,
             UpBlock,
         ),
     )
