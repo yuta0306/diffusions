@@ -6,6 +6,20 @@ from diffusions.models.activation import Swish
 
 
 class EfficientResNetBlock(nn.Module):
+
+    in_channels: int
+    out_channels: int
+    groups: int
+    groups_out: int
+    output_scale_factor: float
+    norm1: nn.GroupNorm
+    norm2: nn.GroupNorm
+    act1: Union[Swish, nn.SiLU, nn.Mish]
+    act2: Union[Swish, nn.SiLU, nn.Mish]
+    conv1: nn.Conv2d
+    conv2: nn.Conv2d
+    conv_shortcut: nn.Conv2d
+
     def __init__(
         self,
         in_channels: int,
@@ -32,7 +46,13 @@ class EfficientResNetBlock(nn.Module):
             eps=eps,
             affine=True,
         )
-        self.act1 = non_linearity(**factory_kwargs)
+
+        if isinstance(non_linearity, Swish):
+            beta = factory_kwargs.get("beta")
+            self.act1 = non_linearity(beta=beta)
+        else:
+            self.act1 = non_linearity()
+
         self.conv1 = nn.Conv2d(
             in_channels=in_channels,
             out_channels=self.out_channels,
@@ -44,7 +64,13 @@ class EfficientResNetBlock(nn.Module):
             eps=eps,
             affine=True,
         )
-        self.act2 = non_linearity(**factory_kwargs)
+
+        if isinstance(non_linearity, Swish):
+            beta = factory_kwargs.get("beta")
+            self.act2 = non_linearity(beta=beta)
+        else:
+            self.act2 = non_linearity()
+
         self.conv2 = nn.Conv2d(
             in_channels=self.out_channels,
             out_channels=self.out_channels,
