@@ -1,4 +1,4 @@
-from typing import Tuple
+from typing import Dict, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -9,13 +9,13 @@ class UnconditionalImagen(nn.Module):
     def __init__(
         self,
         unets: Tuple[UnconditionalEfficientUnet, ...],
-        image_sizes: Tuple[int, ...],
+        sample_sizes: Tuple[int, ...],
         device: str = "cpu",
     ) -> None:
         super(UnconditionalImagen, self).__init__()
 
         self.unets = unets
-        self.image_sizes = image_sizes
+        self.sample_sizes = sample_sizes
         self.device = device
 
     def to(self, device):
@@ -30,3 +30,16 @@ class UnconditionalImagen(nn.Module):
             ]
         )
         return self
+
+    def forward(
+        self,
+        sample: torch.Tensor,
+        timestep: Union[torch.Tensor, float, int],
+        index: int,
+    ) -> Dict[str, torch.Tensor]:
+        self._set_device(index)
+        unet = self.unets[index]
+
+        out = unet(sample=sample, timestep=timestep)
+
+        return out
