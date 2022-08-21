@@ -1,3 +1,4 @@
+from . import imagen
 from .activation import Swish
 from .attention import AttentionBlock, CrossAttention
 from .blocks import (
@@ -29,4 +30,5 @@ __all__ = [
     "UNetMidCrossAttentionBlock",
     "UpBlock",
     "Upsample2D",
+    "imagen",
 ]
