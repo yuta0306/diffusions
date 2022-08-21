@@ -108,6 +108,9 @@ class AttentionBlock(nn.Module):
         attention_scores = (
             torch.einsum("bhid, bhjd -> bhij", query, key) * scale
         )  # i = j = t
+
+        # TODO
+        # calculate softmax on torch.float32
         attention_probs = F.softmax(attention_scores.float(), dim=-1).type(
             attention_scores.dtype
         )
@@ -189,11 +192,15 @@ class CrossAttention(nn.Module):
         sim = torch.einsum("bhid, bhjd -> bhij", query, key) * self.scale
 
         if mask is not None:
+            # TODO
+            # implement value.masked_fill_(~mask, 0.0)
             mask = mask.reshape(B, -1)
             big_neg = -torch.finfo(sim.dtype).max
             mask = mask[:, None, :].repeat(self.heads, 1, 1)
             sim.masked_fill_(~mask, big_neg)
 
+        # TODO
+        # calculate softmax on torch.float32
         attention_weights = F.softmax(sim, dim=-1)
 
         out = torch.einsum("bhij, bhjd -> bhid", attention_weights, value)
