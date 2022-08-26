@@ -94,6 +94,7 @@ class EfficientDownBlock(nn.Module):
                 out_channels=out_channels,
                 kernel_size=3,
                 stride=stride if stride is not None else 2,
+                padding=1,
             )
 
         self.comb_embs = None
@@ -105,7 +106,9 @@ class EfficientDownBlock(nn.Module):
 
         resnets = [
             EfficientResNetBlock(
-                in_channels=in_channels if i == 0 else out_channels,
+                in_channels=in_channels
+                if i == 0 and not add_downsampling
+                else out_channels,
                 out_channels=out_channels,
                 groups=groups,
                 groups_out=groups,
@@ -133,15 +136,16 @@ class EfficientDownBlock(nn.Module):
         hidden_states: torch.Tensor,
         temb: Optional[torch.Tensor] = None,
         context: Optional[torch.Tensor] = None,  # not implemented
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        states: Tuple[torch.Tensor, ...] = ()
         # TODO
         if context is not None:
             raise NotImplementedError
-        # states: Tuple[torch.Tensor, ...] = ()
 
         # downsampling
         if self.downsampler is not None:
             hidden_states = self.downsampler(hidden_states)
+            states += (hidden_states,)
 
         # combine embeddings
         scale_shift = None
@@ -150,16 +154,17 @@ class EfficientDownBlock(nn.Module):
             scale_shift = einops.rearrange(temb, "b c -> b c 1 1")
             scale_shift = scale_shift.chunk(chunks=2, dim=1)
 
+        # print("down block > resnets")
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states, scale_shift=scale_shift)
-            # states += (hidden_states,)
+            states += (hidden_states,)
 
         if self.attention is not None:
             hidden_states = self.attention(hidden_states)
 
-            # states += (hidden_states,)
+            states += (hidden_states,)
 
-        return hidden_states
+        return hidden_states, states
 
 
 class EfficientUpBlock(nn.Module):
@@ -183,15 +188,6 @@ class EfficientUpBlock(nn.Module):
     ) -> None:
         super(EfficientUpBlock, self).__init__()
 
-        self.upsampler = None
-        if add_upsampling:
-            self.upsampler = nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=3,
-                stride=stride if stride is not None else 2,
-            )
-
         self.comb_embs = None
         if temb_channels is not None:
             self.comb_embs = nn.Sequential(
@@ -201,12 +197,9 @@ class EfficientUpBlock(nn.Module):
 
         resnets = []
         for i in range(num_layers):
-            skip_channels = in_channels if (i == num_layers - 1) else out_channels
-            in_channels = prev_channels if i == 0 else out_channels
-
             resnets.append(
                 EfficientResNetBlock(
-                    in_channels=in_channels + skip_channels,
+                    in_channels=in_channels + prev_channels if i == 0 else out_channels,
                     out_channels=out_channels,
                     temb_channels=temb_channels,
                     eps=eps,
@@ -229,20 +222,29 @@ class EfficientUpBlock(nn.Module):
                 eps=eps,
             )
 
+        self.upsampler = None
+        if add_upsampling:
+            self.upsampler = nn.Sequential(
+                nn.Upsample(scale_factor=2, mode="nearest"),
+                nn.Conv2d(
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    kernel_size=3,
+                    stride=stride if stride is not None else 1,
+                    padding=1,
+                ),
+            )
+
     def forward(
         self,
         hidden_states: torch.Tensor,
-        res_hidden_states: torch.Tensor,
+        res_hidden_states: Tuple[torch.Tensor, ...],
         temb: Optional[torch.Tensor] = None,
         context: Optional[torch.Tensor] = None,  # not implemented
     ) -> torch.Tensor:
         # TODO
         if context is not None:
             raise NotImplementedError
-        # states: Tuple[torch.Tensor, ...] = ()
-
-        # residual
-        hidden_states = torch.cat([hidden_states, res_hidden_states], dim=1)
 
         # combine embeddings
         scale_shift = None
@@ -251,14 +253,16 @@ class EfficientUpBlock(nn.Module):
             scale_shift = einops.rearrange(temb, "b c -> b c 1 1")
             scale_shift = scale_shift.chunk(chunks=2, dim=1)
 
+        # residual
+        res_states = res_hidden_states[-1]
+        res_hidden_states = res_hidden_states[:-1]
+        hidden_states = torch.cat([hidden_states, res_states], dim=1)
+
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states, scale_shift=scale_shift)
-            # states += (hidden_states,)
 
         if self.attention is not None:
             hidden_states = self.attention(hidden_states)
-
-            # states += (hidden_states,)
 
         # upsampling
         if self.upsampler is not None:

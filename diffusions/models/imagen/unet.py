@@ -83,10 +83,11 @@ class UnconditionalEfficientUnet(nn.Module):
             self.num_heads = num_heads
 
         down_blocks = []
-        out_channels = block_out_channels[0]
+        out_channel = block_out_channels[0]
         for i in range(len(block_out_channels)):
-            in_channel = out_channels
+            in_channel = out_channel
             out_channel = block_out_channels[i]
+            is_final_block = i == len(block_out_channels) - 1
 
             n_heads = self.num_heads[i]
             add_attention = n_heads is not None
@@ -102,9 +103,10 @@ class UnconditionalEfficientUnet(nn.Module):
                     num_layers=self.layers_per_block[i],
                     eps=eps,
                     non_linearity=non_linearity,
-                    groups=groups,
+                    # groups=groups,
                     add_attention=add_attention,
                     num_heads=n_heads,
+                    add_downsampling=not is_final_block,
                     **factory_kwargs,
                 )
             )
@@ -125,13 +127,13 @@ class UnconditionalEfficientUnet(nn.Module):
         reversed_block_out_channels = list(reversed(block_out_channels))
         reversed_layers_per_block = tuple(reversed(self.layers_per_block))
         reversed_num_heads = tuple(reversed(self.num_heads))
-        out_channel = reversed_block_out_channels[0]
         for i in range(len(block_out_channels)):
-            prev_channel = out_channel
-            out_channel = reversed_block_out_channels[i]
-            in_channel = reversed_block_out_channels[
+            in_channel = reversed_block_out_channels[i]
+            prev_channel = reversed_block_out_channels[i]
+            out_channel = reversed_block_out_channels[
                 min(i + 1, len(block_out_channels) - 1)
             ]
+            is_first_block = i == 0
 
             n_heads = reversed_num_heads[i]
             add_attention = n_heads is not None
@@ -143,19 +145,34 @@ class UnconditionalEfficientUnet(nn.Module):
                     in_channels=in_channel,
                     prev_channels=prev_channel,
                     out_channels=out_channel,
-                    stride=(2, 2),
+                    stride=(1, 1),
                     num_layers=reversed_layers_per_block[i],
                     eps=eps,
                     non_linearity=non_linearity,
-                    groups=groups,
+                    # groups=groups,
                     add_attention=add_attention,
                     num_heads=n_heads,
+                    add_upsampling=not is_first_block,
                     **factory_kwargs,
                 )
             )
             self.up_blocks = nn.ModuleList(up_blocks)
 
-            self.dense = nn.Linear(block_out_channels[0], out_channels)
+            # self.dense = nn.Linear(block_out_channels[0], out_channels)
+            self.dense = nn.Sequential(
+                nn.GroupNorm(
+                    num_groups=groups,
+                    num_channels=block_out_channels[0],
+                    eps=eps,
+                ),
+                nn.SiLU(),
+                nn.Conv2d(
+                    in_channels=block_out_channels[0],
+                    out_channels=out_channels,
+                    kernel_size=3,
+                    padding=1,
+                ),
+            )
 
     def forward(
         self, sample: torch.Tensor, timestep: Union[torch.Tensor, float, int]
@@ -174,19 +191,46 @@ class UnconditionalEfficientUnet(nn.Module):
         sample = self.conv_in(sample)
 
         # downsampling
-        res: Tuple[torch.Tensor, ...] = ()
+        res_samples: Tuple[torch.Tensor, ...] = ()
         for down_block in self.down_blocks:
-            sample = down_block(hidden_states=sample, temb=emb)
-            res += (sample,)
+            sample, res = down_block(hidden_states=sample, temb=emb)
+            res_samples += res
 
         # mid
         sample = self.mid_block(sample, emb)
 
         # upsampling
+        down_block_res_samples = res_samples
         for i, up_block in enumerate(self.up_blocks, 1):
-            sample = up_block(sample, res[-i], emb)
+            layers = (
+                len(up_block.resnets)
+                + (1 if up_block.attention is not None else 0)
+                + (1 if up_block.upsampler is not None else 0)
+            )
+            res_samples = down_block_res_samples[-layers:]
+            down_block_res_samples = down_block_res_samples[:-layers]
+            sample = up_block(sample, res_samples, emb)
 
         # postprocess
         sample = self.dense(sample)
 
         return {"sample": sample}
+
+
+if __name__ == "__main__":
+    model = UnconditionalEfficientUnet(
+        sample_size=64,
+        in_channels=3,
+        out_channels=3,
+        block_out_channels=(32, 64, 128, 256),
+        layers_per_block=3,
+        num_heads=(None, 1, 2, 4),
+    )
+    # print(model)
+
+    inp = torch.randn((2, 3, 64, 64))
+    print(inp.size())
+
+    out = model(inp, 0)
+    print(out["sample"].size())
+    print(out["sample"])

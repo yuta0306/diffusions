@@ -38,11 +38,12 @@ class EfficientResNetBlock(nn.Module):
 
         self.groups = groups
         if groups_out is None:
-            self.groups_out = groups
+            groups_out = groups
+        self.groups_out = groups_out
 
         self.norm1 = nn.GroupNorm(
             num_groups=groups,
-            num_channels=self.groups_out,
+            num_channels=in_channels,
             eps=eps,
             affine=True,
         )
@@ -57,10 +58,12 @@ class EfficientResNetBlock(nn.Module):
             in_channels=in_channels,
             out_channels=self.out_channels,
             kernel_size=3,
+            stride=1,
+            padding=1,
         )
         self.norm2 = nn.GroupNorm(
-            num_groups=groups,
-            num_channels=self.groups_out,
+            num_groups=groups_out,
+            num_channels=self.out_channels,
             eps=eps,
             affine=True,
         )
@@ -75,12 +78,16 @@ class EfficientResNetBlock(nn.Module):
             in_channels=self.out_channels,
             out_channels=self.out_channels,
             kernel_size=3,
+            stride=1,
+            padding=1,
         )
 
         self.conv_shortcut = nn.Conv2d(
             in_channels=in_channels,
             out_channels=self.out_channels,
             kernel_size=1,
+            stride=1,
+            padding=1,
         )
 
         self.output_scale_factor = output_scale_factor
