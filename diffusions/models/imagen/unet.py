@@ -36,6 +36,7 @@ class UnconditionalEfficientUnet(nn.Module):
         num_heads: Union[int, Tuple[Union[int, None], ...]] = 8,
         groups: int = 8,
         eps: float = 1e-6,
+        res_scale: float = 2**-0.5,
         **factory_kwargs,
     ) -> None:
         super(UnconditionalEfficientUnet, self).__init__()
@@ -174,6 +175,8 @@ class UnconditionalEfficientUnet(nn.Module):
                 ),
             )
 
+        self.res_scale = res_scale
+
     def forward(
         self, sample: torch.Tensor, timestep: Union[torch.Tensor, float, int]
     ) -> Dict[str, torch.Tensor]:
@@ -200,7 +203,9 @@ class UnconditionalEfficientUnet(nn.Module):
         sample = self.mid_block(sample, emb)
 
         # upsampling
-        down_block_res_samples = res_samples
+        down_block_res_samples = tuple(
+            res * self.res_scale for res in res_samples
+        )  # scaling
         for i, up_block in enumerate(self.up_blocks, 1):
             layers = (
                 len(up_block.resnets)
