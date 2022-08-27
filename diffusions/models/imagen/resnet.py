@@ -1,5 +1,6 @@
 from typing import Optional, Type, Union
 
+import einops
 import torch
 import torch.nn as nn
 from diffusions.models.activation import Swish
@@ -9,6 +10,7 @@ class EfficientResNetBlock(nn.Module):
 
     in_channels: int
     out_channels: int
+    temb_channels: int
     groups: int
     groups_out: int
     output_scale_factor: float
@@ -24,6 +26,7 @@ class EfficientResNetBlock(nn.Module):
         self,
         in_channels: int,
         out_channels: Optional[int] = None,
+        temb_channels: Optional[int] = None,
         groups: int = 8,
         groups_out: Optional[int] = None,
         eps: float = 1e-6,
@@ -82,6 +85,12 @@ class EfficientResNetBlock(nn.Module):
             padding=1,
         )
 
+        self.time_emb_proj = None
+        if temb_channels is not None:
+            self.time_emb_proj = nn.Sequential(
+                nn.SiLU(), nn.Linear(temb_channels, self.out_channels * 2)
+            )
+
         self.conv_shortcut = nn.Conv2d(
             in_channels=in_channels,
             out_channels=self.out_channels,
@@ -93,9 +102,18 @@ class EfficientResNetBlock(nn.Module):
         self.output_scale_factor = output_scale_factor
 
     def forward(
-        self, x: torch.Tensor, scale_shift: Optional[torch.Tensor] = None
+        self,
+        x: torch.Tensor,
+        temb: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         h = x
+
+        # combine embeddings
+        scale_shift = None
+        if temb is not None and self.time_emb_proj is not None:
+            temb = self.time_emb_proj(temb)
+            scale_shift = einops.rearrange(temb, "b c -> b c 1 1")
+            scale_shift = scale_shift.chunk(chunks=2, dim=1)
 
         h = self.norm1(h)
         h = self.act1(h)
@@ -104,7 +122,7 @@ class EfficientResNetBlock(nn.Module):
         h = self.norm2(h)
         if scale_shift is not None:
             scale, shift = scale_shift
-            h = h * (h + scale) + shift
+            h = h * (1 + scale) + shift
         h = self.act2(h)
         h = self.conv2(h)
 

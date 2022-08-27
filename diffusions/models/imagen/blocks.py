@@ -1,6 +1,5 @@
 from typing import Optional, Tuple, Type, Union
 
-import einops
 import torch
 import torch.nn as nn
 from diffusions.models.activation import Swish
@@ -12,7 +11,7 @@ class EfficientUNetMidBlock(nn.Module):
     def __init__(
         self,
         in_channels: int,
-        temb_channels: int,
+        temb_channels: Optional[int] = None,
         eps: float = 1e-6,
         non_linearity: Union[Type[Swish], Type[nn.SiLU], Type[nn.Mish]] = Swish,
         groups: int = 8,
@@ -26,6 +25,7 @@ class EfficientUNetMidBlock(nn.Module):
         self.mid_1 = EfficientResNetBlock(
             in_channels=in_channels,
             out_channels=in_channels,
+            temb_channels=temb_channels,
             groups=groups,
             eps=eps,
             non_linearity=non_linearity,
@@ -35,6 +35,7 @@ class EfficientUNetMidBlock(nn.Module):
         self.mid_2 = EfficientResNetBlock(
             in_channels=in_channels,
             out_channels=in_channels,
+            temb_channels=temb_channels,
             groups=groups,
             eps=eps,
             non_linearity=non_linearity,
@@ -57,12 +58,12 @@ class EfficientUNetMidBlock(nn.Module):
         hidden_states: torch.Tensor,
         temb: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        hidden_states = self.mid_1(hidden_states)
+        hidden_states = self.mid_1(hidden_states, temb)
 
         if self.attention is not None:
             hidden_states = self.attention(hidden_states)
 
-        hidden_states = self.mid_2(hidden_states)
+        hidden_states = self.mid_2(hidden_states, temb)
 
         return hidden_states
 
@@ -97,19 +98,13 @@ class EfficientDownBlock(nn.Module):
                 padding=1,
             )
 
-        self.comb_embs = None
-        if temb_channels is not None:
-            self.comb_embs = nn.Sequential(
-                nn.SiLU(),
-                nn.Linear(temb_channels, out_channels * 2),
-            )
-
         resnets = [
             EfficientResNetBlock(
                 in_channels=in_channels
                 if i == 0 and not add_downsampling
                 else out_channels,
                 out_channels=out_channels,
+                temb_channels=temb_channels,
                 groups=groups,
                 groups_out=groups,
                 eps=eps,
@@ -147,16 +142,8 @@ class EfficientDownBlock(nn.Module):
             hidden_states = self.downsampler(hidden_states)
             states += (hidden_states,)
 
-        # combine embeddings
-        scale_shift = None
-        if temb is not None and self.comb_embs is not None:
-            temb = self.comb_embs(temb)
-            scale_shift = einops.rearrange(temb, "b c -> b c 1 1")
-            scale_shift = scale_shift.chunk(chunks=2, dim=1)
-
-        # print("down block > resnets")
         for resnet in self.resnets:
-            hidden_states = resnet(hidden_states, scale_shift=scale_shift)
+            hidden_states = resnet(hidden_states, temb)
             states += (hidden_states,)
 
         if self.attention is not None:
@@ -189,11 +176,6 @@ class EfficientUpBlock(nn.Module):
         super(EfficientUpBlock, self).__init__()
 
         self.comb_embs = None
-        if temb_channels is not None:
-            self.comb_embs = nn.Sequential(
-                nn.SiLU(),
-                nn.Linear(temb_channels, out_channels * 2),
-            )
 
         resnets = []
         for i in range(num_layers):
@@ -246,20 +228,13 @@ class EfficientUpBlock(nn.Module):
         if context is not None:
             raise NotImplementedError
 
-        # combine embeddings
-        scale_shift = None
-        if temb is not None and self.comb_embs is not None:
-            temb = self.comb_embs(temb)
-            scale_shift = einops.rearrange(temb, "b c -> b c 1 1")
-            scale_shift = scale_shift.chunk(chunks=2, dim=1)
-
         # residual
         res_states = res_hidden_states[-1]
         res_hidden_states = res_hidden_states[:-1]
         hidden_states = torch.cat([hidden_states, res_states], dim=1)
 
         for resnet in self.resnets:
-            hidden_states = resnet(hidden_states, scale_shift=scale_shift)
+            hidden_states = resnet(hidden_states, temb)
 
         if self.attention is not None:
             hidden_states = self.attention(hidden_states)
