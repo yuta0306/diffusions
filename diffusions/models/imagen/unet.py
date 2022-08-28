@@ -134,6 +134,7 @@ class UnconditionalEfficientUnet(nn.Module):
             out_channel = reversed_block_out_channels[
                 min(i + 1, len(block_out_channels) - 1)
             ]
+            # is_final_block = i == len(block_out_channels) - 1
             is_first_block = i == 0
 
             n_heads = reversed_num_heads[i]
@@ -210,7 +211,7 @@ class UnconditionalEfficientUnet(nn.Module):
             layers = (
                 len(up_block.resnets)
                 + (1 if up_block.attention is not None else 0)
-                + (1 if up_block.upsampler is not None else 0)
+                # + (1 if up_block.upsampler is not None else 0)
             )
             res_samples = down_block_res_samples[-layers:]
             down_block_res_samples = down_block_res_samples[:-layers]

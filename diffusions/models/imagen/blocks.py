@@ -140,7 +140,7 @@ class EfficientDownBlock(nn.Module):
         # downsampling
         if self.downsampler is not None:
             hidden_states = self.downsampler(hidden_states)
-            states += (hidden_states,)
+            # states += (hidden_states,)
 
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states, temb)
@@ -181,7 +181,8 @@ class EfficientUpBlock(nn.Module):
         for i in range(num_layers):
             resnets.append(
                 EfficientResNetBlock(
-                    in_channels=in_channels + prev_channels if i == 0 else out_channels,
+                    in_channels=in_channels
+                    + (prev_channels if i == 0 else out_channels),
                     out_channels=out_channels,
                     temb_channels=temb_channels,
                     eps=eps,
@@ -228,13 +229,14 @@ class EfficientUpBlock(nn.Module):
         if context is not None:
             raise NotImplementedError
 
-        # residual
-        res_states = res_hidden_states[-1]
-        res_hidden_states = res_hidden_states[:-1]
-        hidden_states = torch.cat([hidden_states, res_states], dim=1)
-
         for resnet in self.resnets:
+            # residual
+            res_states = res_hidden_states[-1]
+            res_hidden_states = res_hidden_states[:-1]
+            hidden_states = torch.cat([hidden_states, res_states], dim=1)
+            # print(hidden_states.size(), end="->")
             hidden_states = resnet(hidden_states, temb)
+            # print(hidden_states.size())
 
         if self.attention is not None:
             hidden_states = self.attention(hidden_states)
