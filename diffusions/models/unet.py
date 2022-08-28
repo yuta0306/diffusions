@@ -53,6 +53,7 @@ class UNet(nn.Module):
         head_dim: int = 8,
         groups: int = 32,
         eps: float = 1e-6,
+        memory_efficient: bool = False,
         **factory_kwargs,
     ) -> None:
         super(UNet, self).__init__()
@@ -111,6 +112,7 @@ class UNet(nn.Module):
                     num_head_channels=head_dim,
                     add_downsample=not is_final_block,
                     downsample_padding=downsample_padding,
+                    memory_efficient=memory_efficient,
                     **factory_kwargs,
                 )
             )
@@ -152,6 +154,7 @@ class UNet(nn.Module):
                     non_linearity=non_linearity,
                     num_head_channels=head_dim,
                     add_upsample=not (i == len(block_out_channels) - 1),
+                    memory_efficient=memory_efficient,
                     **factory_kwargs,
                 )
             )
@@ -253,6 +256,7 @@ if __name__ == "__main__":
             AttnUpBlock,
             UpBlock,
         ),
+        memory_efficient=True,
     )
     print(model)
 

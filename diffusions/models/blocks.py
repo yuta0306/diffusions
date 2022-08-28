@@ -224,6 +224,7 @@ class AttnDownBlock(nn.Module):
         output_scale_factor: float = 1.0,
         downsample_padding: int = 1,
         add_downsample: bool = True,
+        memory_efficient: bool = False,
         **factory_kwargs,
     ) -> None:
         super(AttnDownBlock, self).__init__()
@@ -250,6 +251,7 @@ class AttnDownBlock(nn.Module):
                 num_head_channels=num_head_channels,
                 rescale_output_factor=output_scale_factor,
                 eps=eps,
+                use_checkpoint=memory_efficient,
             )
             for _ in range(num_layers)
         ]
@@ -378,6 +380,7 @@ class AttnUpBlock(nn.Module):
         num_head_channels: int = 1,
         output_scale_factor: float = 1.0,
         add_upsample: bool = True,
+        memory_efficient: bool = False,
         **factory_kwargs,
     ) -> None:
         super(AttnUpBlock, self).__init__()
@@ -408,6 +411,7 @@ class AttnUpBlock(nn.Module):
                     num_head_channels=num_head_channels,
                     rescale_output_factor=output_scale_factor,
                     eps=eps,
+                    use_checkpoint=memory_efficient,
                 )
             )
 
