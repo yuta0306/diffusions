@@ -28,8 +28,10 @@ class FeedForward(nn.Module):
         )
 
         self.net = nn.Sequential(
+            nn.LayerNorm(dim),
             in_proj,
-            nn.Dropout(dropout),
+            # nn.Dropout(dropout),
+            nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, dim_out),
         )
 
@@ -160,13 +162,19 @@ class CrossAttention(nn.Module):
         self.heads = heads
         self.scale = dim_head**-0.5
 
+        self.norm = nn.LayerNorm(query_dim)
+        self.norm_context = (
+            nn.LayerNorm(context_dim) if context_dim is not None else nn.Identity()
+        )
+
         self.q_proj = nn.Linear(query_dim, inner_dim, bias=False)
         self.k_proj = nn.Linear(context_dim, inner_dim, bias=False)
         self.v_proj = nn.Linear(context_dim, inner_dim, bias=False)
 
         self.out_proj = nn.Sequential(
             nn.Linear(inner_dim, query_dim),
-            nn.Dropout(p=dropout),
+            # nn.Dropout(p=dropout),
+            nn.LayerNorm(query_dim),
         )
 
     def forward(
@@ -176,6 +184,10 @@ class CrossAttention(nn.Module):
         mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         B, L, D = x.size()
+
+        x = self.norm(x)
+        if context is not None:
+            context = self.norm_context(context)
 
         query = self.q_proj(x)
         if context is None:
