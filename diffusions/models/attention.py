@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
+from torch.utils.checkpoint import checkpoint
 
 
 class FeedForward(nn.Module):
@@ -67,6 +68,7 @@ class AttentionBlock(nn.Module):
         num_groups: int = 32,
         rescale_output_factor: float = 1.0,
         eps: float = 1e-5,
+        use_checkpoint: bool = False,
     ):
         super(AttentionBlock, self).__init__()
         self.channels = channels
@@ -86,7 +88,14 @@ class AttentionBlock(nn.Module):
         self.rescale_output_factor = rescale_output_factor
         self.o_proj = nn.Linear(channels, channels)
 
+        self.checkpoint = use_checkpoint
+
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        if self.checkpoint:
+            return checkpoint(self._forward, hidden_states)
+        return self._forward(hidden_states)
+
+    def _forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         residual = hidden_states
         B, C, H, W = hidden_states.size()
 
@@ -107,15 +116,13 @@ class AttentionBlock(nn.Module):
 
         # attention score
         scale = 1 / math.sqrt(math.sqrt(self.channels / self.num_heads))
-        attention_scores = (
-            torch.einsum("bhid, bhjd -> bhij", query, key) * scale
+        attention_scores = torch.einsum(
+            "bhid, bhjd -> bhij", query * scale, key
         )  # i = j = t
 
-        # TODO
-        # calculate softmax on torch.float32
-        attention_probs = F.softmax(attention_scores.float(), dim=-1).type(
-            attention_scores.dtype
-        )
+        attention_probs = F.softmax(
+            attention_scores.float(), dim=-1, dtype=torch.float32
+        ).type(attention_scores.dtype)
 
         # attention output
         context_states = torch.einsum(
@@ -201,7 +208,7 @@ class CrossAttention(nn.Module):
         key = rearrange(key, "bj(dh) -> bhjd", h=self.heads)
         value = rearrange(value, "bj(dh) -> bhjd", h=self.heads)
 
-        sim = torch.einsum("bhid, bhjd -> bhij", query, key) * self.scale
+        sim = torch.einsum("bhid, bhjd -> bhij", query * self.scale, key)
 
         if mask is not None:
             # TODO
@@ -211,9 +218,7 @@ class CrossAttention(nn.Module):
             mask = mask[:, None, :].repeat(self.heads, 1, 1)
             sim.masked_fill_(~mask, big_neg)
 
-        # TODO
-        # calculate softmax on torch.float32
-        attention_weights = F.softmax(sim, dim=-1)
+        attention_weights = F.softmax(sim, dim=-1, dtype=torch.float32).to(sim.dtype)
 
         out = torch.einsum("bhij, bhjd -> bhid", attention_weights, value)
         out = rearrange(out, "bhid -> bi(hd)")
