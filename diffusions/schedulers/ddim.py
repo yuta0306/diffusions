@@ -43,9 +43,10 @@ class DDIM(NoiseScheduler):
         beta_prod_t = 1 - alpha_prod_t
         beta_prod_t_prev = 1 - alpha_prod_t_prev
 
-        variance = torch.tensor(
-            (beta_prod_t_prev / beta_prod_t) * (1 - alpha_prod_t / alpha_prod_t_prev)
+        variance = (beta_prod_t_prev / beta_prod_t) * (
+            1 - alpha_prod_t / alpha_prod_t_prev
         )
+
         return variance
 
     def step(

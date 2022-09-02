@@ -1,5 +1,6 @@
 [tool.poetry]
 name = "diffusions"
+version = "0.1.6"
 description = "Diffusion models"
 authors = ["yuta0306 <yuta20010306@gmail.com>"]
 license = "MIT"
