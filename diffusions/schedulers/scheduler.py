@@ -14,6 +14,7 @@ class NoiseScheduler:
         scale_beta: bool,
         betas: Optional[Iterable],
         clip_sample: bool,
+        **kwargs,
     ) -> None:
         if betas is not None:
             self.betas = np.asarray(betas)
@@ -30,7 +31,18 @@ class NoiseScheduler:
                     beta_start, beta_end, num_train_timesteps, dtype=np.float32
                 )
         elif scheduler_type == "cosine":
-            raise NotImplementedError
+            """
+            cosine schedule as proposed in https://arxiv.org/abs/2102.09672
+            """
+            s = kwargs.get("s", 0.008)
+            steps = num_train_timesteps + 1
+            x = np.linspace(0, num_train_timesteps, steps)
+            alphas_cumprod = (
+                np.cos(((x / num_train_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
+            )
+            alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+            beta = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+            self.betas = np.clip(beta, 0.0001, 0.9999)
         else:
             raise NotImplementedError
 
