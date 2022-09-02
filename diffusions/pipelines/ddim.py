@@ -86,7 +86,7 @@ class DDIMPipeline(nn.Module):
                 .astype("uint8")
             )
             outs = []
-            for i in range(images_processed.size(0)):
+            for i in range(images_processed.shape[0]):
                 outs.append(Image.fromarray(images_processed[i], mode="RGB"))
 
         elif images.ndim == 3:
