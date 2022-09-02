@@ -29,9 +29,7 @@ class DDIM(NoiseScheduler):
         )
 
         self.final_alpha_cumprod = (
-            np.array(1.0, dtype=self.alphas_cumprod.dtype)
-            if alpha_to_one
-            else self.alphas_cumprod[0]
+            np.array(1.0) if alpha_to_one else self.alphas_cumprod[0]
         )
         self.dynamic_threshold = dynamic_threshold
 
