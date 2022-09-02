@@ -40,6 +40,7 @@ class NoiseScheduler:
             alphas_cumprod = (
                 np.cos(((x / num_train_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
             )
+            alphas_cumprod = alphas_cumprod.astype(np.float32)
             alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
             beta = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
             self.betas = np.clip(beta, 0.0001, 0.9999)
