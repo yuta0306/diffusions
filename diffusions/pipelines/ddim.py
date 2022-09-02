@@ -3,13 +3,13 @@ from typing import Dict, Optional
 import torch
 import torch.nn as nn
 from diffusions.models import UNet
-from diffusions.schedulers.ddpm import DDPM
+from diffusions.schedulers.ddim import DDIM
 from tqdm.auto import tqdm
 
 
-class DDPMPipeline(nn.Module):
-    def __init__(self, unet: UNet, scheduler: DDPM) -> None:
-        super(DDPMPipeline, self).__init__()
+class DDIMPipeline(nn.Module):
+    def __init__(self, unet: UNet, scheduler: DDIM) -> None:
+        super(DDIMPipeline, self).__init__()
         self.unet = unet
         self.scheduler = scheduler
 
@@ -19,7 +19,8 @@ class DDPMPipeline(nn.Module):
         batch_size: int = 1,
         generator: Optional[torch.Generator] = None,
         device: Optional[str] = None,
-        timesteps: int = 1000,
+        eta: float = 0.0,
+        timesteps: int = 50,
         p: float = 99.5,
     ) -> Dict[str, torch.Tensor]:
         if device is None:
@@ -49,6 +50,7 @@ class DDPMPipeline(nn.Module):
                 model_output=model_output,
                 timestep=t,
                 sample=images,
+                eta=eta,
                 p=p,
             )["prev_sample"]
 
