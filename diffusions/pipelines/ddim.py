@@ -81,6 +81,7 @@ class DDIMPipeline(nn.Module):
         if images.ndim == 4:
             images_processed = (
                 einops.rearrange((images * 255).round(), "b c h w -> b h w c")
+                .cpu()
                 .numpy()
                 .astype("uint8")
             )
@@ -91,6 +92,7 @@ class DDIMPipeline(nn.Module):
         elif images.ndim == 3:
             images_processed = (
                 einops.rearrange((images * 255).round(), "c h w -> h w c")
+                .cpu()
                 .numpy()
                 .astype("uint8")
             )
