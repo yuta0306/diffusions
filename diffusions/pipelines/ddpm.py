@@ -41,7 +41,7 @@ class DDPMPipeline(nn.Module):
 
         self.scheduler.set_timesteps(num_inference_steps=timesteps)
 
-        for t in tqdm(self.scheduler.timesteps):
+        for t in tqdm(self.scheduler.timesteps, leave=False):
             model_output = self.unet(images, t)["sample"]
 
             images = self.scheduler.step(
