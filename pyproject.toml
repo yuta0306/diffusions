@@ -1,9 +1,12 @@
 [tool.poetry]
 name = "diffusions"
-version = "0.1.0"
 description = "Diffusion models"
-authors = ["Your Name <you@example.com>"]
+authors = ["yuta0306 <yuta20010306@gmail.com>"]
 license = "MIT"
+homepage = "https://github.com/yuta0306/diffusions"
+repository = "https://github.com/yuta0306/diffusions"
+readme = "README.md"
+
 
 [tool.poetry.dependencies]
 python = ">=3.7,<4.0"
