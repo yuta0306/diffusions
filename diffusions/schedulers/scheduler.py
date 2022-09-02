@@ -36,7 +36,7 @@ class NoiseScheduler:
             """
             s = kwargs.get("s", 0.008)
             steps = num_train_timesteps + 1
-            x = np.linspace(0, num_train_timesteps, steps)
+            x = np.linspace(0, num_train_timesteps, steps, dtype=np.float32)
             alphas_cumprod = (
                 np.cos(((x / num_train_timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
             )
