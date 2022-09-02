@@ -43,7 +43,6 @@ class DDIMPipeline(nn.Module):
                 self.unet.sample_size if self.unet.sample_size is not None else 128,
             ),
             generator=generator,
-            dtype=self.unet.conv_in.weight.dtype,
         )
 
         images = images.to(device)
