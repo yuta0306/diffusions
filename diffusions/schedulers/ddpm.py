@@ -16,6 +16,7 @@ class DDPM(NoiseScheduler):
         betas: Optional[Iterable] = None,
         variance_type: str = "fixed_small",
         clip_sample: bool = True,
+        dynamic_threshold: bool = False,
     ) -> None:
         super().__init__(
             num_train_timesteps=num_train_timesteps,
@@ -30,11 +31,9 @@ class DDPM(NoiseScheduler):
         self.one = np.array(1.0)
 
         self.variance_type = variance_type
+        self.dynamic_threshold = dynamic_threshold
 
-        # numpy to tensor
-        for key, value in vars(self).items():
-            if isinstance(value, np.ndarray):
-                setattr(self, key, torch.from_numpy(value))
+        self.convert_tensor()
 
     def _get_variance(
         self,
@@ -77,6 +76,7 @@ class DDPM(NoiseScheduler):
         sample: torch.Tensor,
         predict_eps: bool = True,
         generator: Optional[torch.Generator] = None,
+        p: float = 99.5,
     ) -> Dict[str, torch.Tensor]:
         t = timestep
 
@@ -100,7 +100,10 @@ class DDPM(NoiseScheduler):
             pred_original_sample = model_output
 
         if self.clip_sample:
-            pred_original_sample = torch.clamp(pred_original_sample, -1, 1)
+            if self.dynamic_threshold:
+                pred_original_sample = self.dynamic_clip(pred_original_sample, p=p)
+            else:
+                pred_original_sample = self.clip(pred_original_sample, -1, 1)
 
         pred_original_sample_coeff = (
             alpha_prod_t_prev**0.5 * self.betas[t]

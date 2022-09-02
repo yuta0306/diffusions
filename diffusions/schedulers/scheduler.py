@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Optional
+from typing import Iterable, Optional
 
 import numpy as np
 import torch
@@ -119,13 +119,3 @@ class NoiseScheduler:
 
     def __len__(self) -> int:
         return self.num_train_steps
-
-    def step(
-        self,
-        model_output: torch.Tensor,
-        timestep: int,
-        sample: torch.Tensor,
-        predict_eps: bool = True,
-        generator: Optional[torch.Generator] = None,
-    ) -> Dict[str, torch.Tensor]:
-        raise NotImplementedError
