@@ -59,7 +59,6 @@ class DDIM(NoiseScheduler):
         p: float = 99.5,
         use_clipped_model_output: bool = False,
     ) -> Dict[str, torch.Tensor]:
-        print("sample:", sample.dtype)
         t = timestep
         prev_t = t - self.num_train_steps // self.num_inference_steps
 
@@ -72,7 +71,6 @@ class DDIM(NoiseScheduler):
         pred_original_sample = (
             sample - beta_prod_t**0.5 * model_output
         ) / alpha_prod_t**0.5
-        print("pred_original_sample:", pred_original_sample.dtype)
 
         if self.clip_sample:
             if self.dynamic_threshold:
@@ -80,12 +78,9 @@ class DDIM(NoiseScheduler):
                 pred_original_sample = self.dynamic_clip(pred_original_sample, p=p)
             else:
                 pred_original_sample = self.clip(pred_original_sample, -1, 1)
-        print("after threshold:", pred_original_sample.dtype)
 
         variance = self._get_variance(t, prev_t)
-        print("variance:", variance.dtype)
         std_dev_t = eta * variance**0.5
-        print("std_dev_t:", std_dev_t.dtype)
 
         if use_clipped_model_output:
             raise NotImplementedError
@@ -93,7 +88,6 @@ class DDIM(NoiseScheduler):
         pred_sample_direction = (
             1 - alpha_prod_t_prev - std_dev_t**2
         ) ** 0.5 * model_output
-        print("pred_sample_direction:", pred_sample_direction.dtype)
 
         prev_sample = (
             alpha_prod_t_prev**0.5 * pred_original_sample + pred_sample_direction
@@ -107,6 +101,5 @@ class DDIM(NoiseScheduler):
             variance = self._get_variance(t, prev_t) ** 0.5 * eta * noise
 
             prev_sample = prev_sample + variance
-        print("final:", prev_sample.dtype)
 
         return {"prev_sample": prev_sample}

@@ -80,6 +80,7 @@ class NoiseScheduler:
         implemented on raw PyTorch
         """
         samples = inputs.detach().cpu().numpy()
+        print("samples:", samples.dtype)
         s = np.percentile(
             np.abs(samples),
             p,
@@ -87,7 +88,10 @@ class NoiseScheduler:
                 range(1, inputs.ndim),
             ),
         )
+        print(s.dtype)
         s = np.maximum(s, 1.0)
+        print(s.dtype)
+        print((np.clip(samples, -s, s) / s).dtype)
 
         return torch.from_numpy(np.clip(samples, -s, s) / s).to(device=inputs.device)
 
