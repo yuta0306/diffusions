@@ -1,9 +1,12 @@
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
+import einops
+import numpy as np
 import torch
 import torch.nn as nn
 from diffusions.models import UNet
 from diffusions.schedulers.ddpm import DDPM
+from PIL import Image
 from tqdm.auto import tqdm
 
 
@@ -21,7 +24,10 @@ class DDPMPipeline(nn.Module):
         device: Optional[str] = None,
         timesteps: int = 1000,
         p: float = 99.5,
-    ) -> Dict[str, torch.Tensor]:
+        return_type: str = "pt",
+        *,
+        out: Optional[list] = None,
+    ) -> Dict[str, Union[torch.Tensor, np.ndarray, Image.Image]]:
         if device is None:
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -52,11 +58,45 @@ class DDPMPipeline(nn.Module):
                 p=p,
             )["prev_sample"]
 
+            if out is not None:
+                out.append(self.tensor_to_pil(images))
+
         images = (images / 2 + 0.5).clamp(0, 1)
         images = images.cpu()
 
+        if return_type == "pt":
+            pass
+        elif return_type == "np":
+            images = images.numpy()
+        elif return_type == "pil":
+            pass
+
         return {"sample": images}
 
-    @staticmethod
-    def tensor_to_pil(self, images: torch.Tensor):
-        raise NotImplementedError
+    def tensor_to_pil(
+        self, images: torch.Tensor
+    ) -> Union[Image.Image, List[Image.Image]]:
+        if images.ndim == 4:
+            images_processed = (
+                einops.rearrange((images * 255).round(), "b c h w -> b h w c")
+                .cpu()
+                .numpy()
+                .astype("uint8")
+            )
+            outs = []
+            for i in range(images_processed.shape[0]):
+                outs.append(Image.fromarray(images_processed[i], mode="RGB"))
+
+        elif images.ndim == 3:
+            images_processed = (
+                einops.rearrange((images * 255).round(), "c h w -> h w c")
+                .cpu()
+                .numpy()
+                .astype("uint8")
+            )
+            outs = Image.fromarray(images_processed, mode="RGB")
+
+        else:
+            raise ValueError
+
+        return outs
