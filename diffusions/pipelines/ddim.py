@@ -50,7 +50,9 @@ class DDIMPipeline(nn.Module):
         self.scheduler.set_timesteps(num_inference_steps=timesteps)
 
         for t in tqdm(self.scheduler.timesteps, leave=False):
+            print(images.dtype)
             model_output = self.unet(images, t)["sample"]
+            print(model_output.dtype)
 
             images = self.scheduler.step(
                 model_output=model_output,
