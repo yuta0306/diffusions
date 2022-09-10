@@ -1,6 +1,6 @@
 from . import imagen
 from .activation import Swish
-from .attention import AttentionBlock, CrossAttention
+from .attention import AttentionBlock, CrossAttention, MemoryEfficientAttention
 from .blocks import (
     AttnDownBlock,
     AttnUpBlock,
@@ -21,6 +21,7 @@ __all__ = [
     "DownBlock",
     "Downsample2D",
     "GaussianFourierProjection",
+    "MemoryEfficientAttention",
     "ResnetBlock",
     "Swish",
     "TimestepEmbedding",

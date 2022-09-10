@@ -3,7 +3,11 @@ from typing import Optional, Tuple, Type, Union
 import torch
 import torch.nn as nn
 from diffusions.models.activation import Swish
-from diffusions.models.attention import AttentionBlock, SpatialTransformer
+from diffusions.models.attention import (
+    AttentionBlock,
+    MemoryEfficientAttention,
+    SpatialTransformer,
+)
 from diffusions.models.resnet import Downsample2D, ResnetBlock, Upsample2D
 
 
@@ -246,12 +250,21 @@ class AttnDownBlock(nn.Module):
             for i in range(num_layers)
         ]
         attentions = [
-            AttentionBlock(
+            MemoryEfficientAttention(
                 channels=out_channels,
                 num_head_channels=num_head_channels,
+                num_groups=groups,
                 rescale_output_factor=output_scale_factor,
                 eps=eps,
-                use_checkpoint=memory_efficient,
+            )
+            if memory_efficient
+            else AttentionBlock(
+                channels=out_channels,
+                num_head_channels=num_head_channels,
+                num_groups=groups,
+                rescale_output_factor=output_scale_factor,
+                eps=eps,
+                use_checkpoint=True,
             )
             for _ in range(num_layers)
         ]
@@ -406,12 +419,21 @@ class AttnUpBlock(nn.Module):
                 )
             )
             attentions.append(
-                AttentionBlock(
+                MemoryEfficientAttention(
                     channels=out_channels,
                     num_head_channels=num_head_channels,
+                    num_groups=groups,
                     rescale_output_factor=output_scale_factor,
                     eps=eps,
-                    use_checkpoint=memory_efficient,
+                )
+                if memory_efficient
+                else AttentionBlock(
+                    channels=out_channels,
+                    num_head_channels=num_head_channels,
+                    num_groups=groups,
+                    rescale_output_factor=output_scale_factor,
+                    eps=eps,
+                    use_checkpoint=True,
                 )
             )
 

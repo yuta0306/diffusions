@@ -5,6 +5,7 @@ import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from diffusions.utils.jax import dynamic_slice, map_, scan
 from einops import rearrange
 from torch.utils.checkpoint import checkpoint
 
@@ -225,6 +226,140 @@ class CrossAttention(nn.Module):
         return self.out_proj(out)
 
 
+class MemoryEfficientAttention(nn.Module):
+    """Memory Efficient Attention
+    `Self-attention Does Not Need $O(n^2)$ Memory <https://arxiv.org/ags/2112.05682>`
+    `Attention Is All You Need <https://arxiv.org/abs/1706.03762>`
+    """
+
+    def __init__(
+        self,
+        channels: int,
+        num_head_channels: Optional[int] = None,
+        num_groups: int = 32,
+        rescale_output_factor: float = 1.0,
+        eps: float = 1e-5,
+        query_chunk_size: int = 1024,
+        key_chunk_size: int = 4096,  # 4096
+    ) -> None:
+        super(MemoryEfficientAttention, self).__init__()
+        self.channels = channels
+
+        self.num_heads = (
+            channels // num_head_channels if num_head_channels is not None else 1
+        )
+        self.head_dim = num_head_channels if num_head_channels is not None else 1
+        self.norm = nn.GroupNorm(
+            num_channels=channels, num_groups=num_groups, eps=eps, affine=True
+        )
+
+        # q, k, v projection
+        self.q_proj = nn.Linear(channels, channels)
+        self.k_proj = nn.Linear(channels, channels)
+        self.v_proj = nn.Linear(channels, channels)
+
+        self.rescale_output_factor = rescale_output_factor
+        self.o_proj = nn.Linear(channels, channels)
+
+        self.query_chunk_size = query_chunk_size
+        self.key_chunk_size = key_chunk_size
+
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        residual = hidden_states
+        B, C, H, W = hidden_states.size()
+        num_q = H * W
+
+        # norm
+        hidden_states = self.norm(hidden_states)
+        hidden_states = einops.rearrange(hidden_states, "b c h w -> b (h w) c")
+
+        query = self.q_proj(hidden_states)
+        key = self.k_proj(hidden_states)
+        value = self.v_proj(hidden_states)
+
+        query_chunk_size = min(self.query_chunk_size, num_q)
+
+        # split head
+        query = einops.rearrange(query, "b t (h d) -> b t h d", h=self.num_heads)
+        key = einops.rearrange(key, "b t (h d) -> b t h d", h=self.num_heads)
+        value = einops.rearrange(value, "b t (h d) -> b t h d", h=self.num_heads)
+
+        def _chunk_scanner(chunk_idx, _):
+            query_chunk = dynamic_slice(
+                query,
+                (0, chunk_idx, 0, 0),
+                sizes=(B, query_chunk_size, self.num_heads, self.head_dim),
+            )
+            return (
+                chunk_idx + self.query_chunk_size,
+                self._query_chunk_attention(query_chunk, key, value),
+            )
+
+        _, res = scan(
+            _chunk_scanner,
+            init=0,
+            xs=None,
+            length=math.ceil(num_q / self.query_chunk_size),
+        )
+
+        hidden_states = einops.rearrange(res, "c b t h d -> b (c t) (h d)")
+        hidden_states = self.o_proj(hidden_states)
+        hidden_states = einops.rearrange(
+            hidden_states, "b (h w) c -> b c h w", h=H, w=W
+        )
+
+        hidden_states = (hidden_states + residual) / self.rescale_output_factor
+
+        return hidden_states
+
+    def _query_chunk_attention(
+        self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+    ):
+        B, num_kv, num_heads, k_features = key.size()
+        v_features = value.size(-1)
+        key_chunk_size = min(self.key_chunk_size, num_kv)
+        query = query / torch.sqrt(torch.tensor(k_features))
+
+        # with checkpointing
+        def summarize_chunk(
+            query: torch.Tensor, key: torch.Tensor, value: torch.Tensor
+        ):
+            attn_weights = torch.einsum("...qhd, ...khd -> ...qhk", query, key)
+            max_score, _ = torch.max(attn_weights, dim=-1, keepdim=True)
+            max_score = max_score.detach()
+            exp_weights = torch.exp(attn_weights - max_score)
+            exp_values = torch.einsum("...vhf, ...qhv -> ...qhf", value, exp_weights)
+            max_score = torch.einsum("...qhk -> ...qh", max_score)
+            return exp_values, exp_weights.sum(dim=-1), max_score
+
+        def chunk_scanner(chunk_idx):
+            key_chunk = dynamic_slice(
+                key,
+                (0, chunk_idx, 0, 0),
+                sizes=(B, key_chunk_size, num_heads, k_features),
+            )
+            value_chunk = dynamic_slice(
+                value,
+                (0, chunk_idx, 0, 0),
+                sizes=(B, key_chunk_size, num_heads, v_features),
+            )
+
+            return checkpoint(summarize_chunk, query, key_chunk, value_chunk)
+
+        chunk_values, chunk_weights, chunk_max = map_(
+            chunk_scanner, torch.arange(0, num_kv, key_chunk_size)
+        )
+
+        global_max, _ = torch.max(chunk_max, dim=0, keepdim=True)
+        max_diffs = torch.exp(chunk_max - global_max)
+        chunk_values *= torch.unsqueeze(max_diffs, dim=-1)
+        chunk_weights *= max_diffs
+
+        all_values = chunk_values.sum(dim=0)
+        all_weights = torch.unsqueeze(chunk_weights, dim=-1).sum(dim=0)
+        return all_values / all_weights
+
+
 class SpatialTransformer(nn.Module):
 
     n_heads: int
@@ -352,5 +487,7 @@ class TransformerBlock(nn.Module):
 
 if __name__ == "__main__":
     inp = torch.randn((2, 64, 128, 128))
-    model = AttentionBlock(64)
+    print(128 * 128)
+    model = MemoryEfficientAttention(64, num_head_channels=32)
     out = model(inp)
+    print(out.size())
