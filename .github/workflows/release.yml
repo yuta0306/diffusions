@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Next Version"
+        description: "Release version"
         required: true
         default: "x.y.z"
       release_note:
@@ -25,9 +25,9 @@ jobs:
       - name: Add path for Poetry
         run: echo "$HOME/.local/bin" >> $GITHUB_PATH
       - name: Add Poetry Plugin
-        #  poetry plugin add poetry-version-plugin
+        #  poetry plugin add poetry-dynamic-versioning
         run: |
-          poetry self add poetry-version-plugin
+          poetry self add "poetry-dynamic-versioning[plugin]"
       - name: PyPI Settings
         run: |
           poetry config pypi-token.pypi ${{secrets.PYPI_TOKEN}}

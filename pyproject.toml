@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "diffusions"
-version = "0.1.8"
+version = "0.0.0-post.66+1d4aa7e"
 description = "Diffusion models"
 authors = ["yuta0306 <yuta20010306@gmail.com>"]
 license = "MIT"
@@ -23,9 +23,11 @@ isort = "^5.10.1"
 mypy = "^0.971"
 flake8 = "^4.0.1"
 
-[tool.poetry-version-plugin]
-source = "init"
+[tool.poetry-dynamic-versioning]
+enable = true
+vcs = "git"
+style = "semver"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0", "poetry-dynamic-versioning"]
+build-backend = "poetry_dynamic_versioning.backend"
