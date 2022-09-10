@@ -31,9 +31,10 @@ jobs:
       - name: PyPI Settings
         run: |
           poetry config pypi-token.pypi ${{secrets.PYPI_TOKEN}}
-      - name: Build Poetry
+      - name:
+          Build Poetry
+          # git tag v${{ github.event.inputs.version }}
         run: |
-          git tag v${{ github.event.inputs.version }}
           poetry build
           poetry publish
       - name: Create Release
