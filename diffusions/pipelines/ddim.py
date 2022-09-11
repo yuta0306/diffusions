@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import einops
 import numpy as np
@@ -26,9 +26,12 @@ class DDIMPipeline(nn.Module):
         timesteps: int = 50,
         p: float = 99.5,
         return_type: str = "pt",
+        apply_func: Optional[Callable] = None,
         *,
         out: Optional[list] = None,
     ) -> Dict[str, Union[torch.Tensor, np.ndarray, Image.Image]]:
+        assert return_type in ("pt", "np", "pil")
+
         if device is None:
             device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -61,9 +64,18 @@ class DDIMPipeline(nn.Module):
             )["prev_sample"]
 
             if out is not None:
-                out.append(self.tensor_to_pil(images))
+                processed = images.clone()
+                if apply_func is not None:
+                    processed = apply_func(processed)
 
-        images = (images / 2 + 0.5).clamp(0, 1)
+                if return_type == "np":
+                    out.append(processed.cpu().numpy())
+                elif return_type == "pil":
+                    out.append(self.tensor_to_pil(processed))
+                else:
+                    out.append(processed)
+
+        # images = (images / 2 + 0.5).clamp(0, 1)
         images = images.cpu()
 
         if return_type == "pt":
