@@ -256,6 +256,7 @@ class AttnDownBlock(nn.Module):
                 num_groups=groups,
                 rescale_output_factor=output_scale_factor,
                 eps=eps,
+                dropout=dropout,
             )
             if memory_efficient
             else AttentionBlock(
@@ -264,6 +265,7 @@ class AttnDownBlock(nn.Module):
                 num_groups=groups,
                 rescale_output_factor=output_scale_factor,
                 eps=eps,
+                dropout=dropout,
                 use_checkpoint=True,
             )
             for _ in range(num_layers)
@@ -425,6 +427,7 @@ class AttnUpBlock(nn.Module):
                     num_groups=groups,
                     rescale_output_factor=output_scale_factor,
                     eps=eps,
+                    dropout=dropout,
                 )
                 if memory_efficient
                 else AttentionBlock(
@@ -433,6 +436,7 @@ class AttnUpBlock(nn.Module):
                     num_groups=groups,
                     rescale_output_factor=output_scale_factor,
                     eps=eps,
+                    dropout=dropout,
                     use_checkpoint=True,
                 )
             )
