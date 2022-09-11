@@ -34,6 +34,7 @@ jobs:
       - name: Build Poetry
         run: |
           git tag v${{ github.event.inputs.version }}
+          git push --tags --porcelain
           poetry build
           poetry publish
       - name: Create Release

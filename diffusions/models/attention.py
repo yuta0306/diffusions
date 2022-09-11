@@ -23,16 +23,15 @@ class FeedForward(nn.Module):
 
         inner_dim = int(dim * mult)
         dim_out = dim if dim_out is None else dim_out
-        in_proj = (
-            nn.Sequential(nn.Linear(dim, inner_dim), nn.GELU())
-            if not glu
-            else GEGLU(dim, inner_dim)
+        in_proj = nn.Sequential(
+            nn.Linear(dim, inner_dim),
+            nn.GELU() if not glu else GEGLU(dim, inner_dim),
         )
 
         self.net = nn.Sequential(
             nn.LayerNorm(dim),
             in_proj,
-            # nn.Dropout(dropout),
+            nn.Dropout(dropout),
             nn.LayerNorm(inner_dim),
             nn.Linear(inner_dim, dim_out),
         )
@@ -60,7 +59,7 @@ class AttentionBlock(nn.Module):
     q_proj: nn.Linear
     k_proj: nn.Linear
     v_proj: nn.Linear
-    o_proj: nn.Linear
+    o_proj: nn.Sequential
 
     def __init__(
         self,
@@ -69,6 +68,7 @@ class AttentionBlock(nn.Module):
         num_groups: int = 32,
         rescale_output_factor: float = 1.0,
         eps: float = 1e-5,
+        dropout: float = 0.0,
         use_checkpoint: bool = False,
     ):
         super(AttentionBlock, self).__init__()
@@ -87,7 +87,12 @@ class AttentionBlock(nn.Module):
         self.v_proj = nn.Linear(channels, channels)
 
         self.rescale_output_factor = rescale_output_factor
-        self.o_proj = nn.Linear(channels, channels)
+        # self.o_proj = nn.Linear(channels, channels)
+        self.o_proj = nn.Sequential(
+            nn.Linear(channels, channels),
+            nn.Dropout(p=dropout),
+            nn.LayerNorm(channels, eps=eps),
+        )  # dropout and layer norm
 
         self.checkpoint = use_checkpoint
 
@@ -181,7 +186,7 @@ class CrossAttention(nn.Module):
 
         self.out_proj = nn.Sequential(
             nn.Linear(inner_dim, query_dim),
-            # nn.Dropout(p=dropout),
+            nn.Dropout(p=dropout),
             nn.LayerNorm(query_dim),
         )
 
@@ -239,6 +244,7 @@ class MemoryEfficientAttention(nn.Module):
         num_groups: int = 32,
         rescale_output_factor: float = 1.0,
         eps: float = 1e-5,
+        dropout: float = 0.0,
         query_chunk_size: int = 1024,
         key_chunk_size: int = 4096,  # 4096
     ) -> None:
@@ -259,7 +265,12 @@ class MemoryEfficientAttention(nn.Module):
         self.v_proj = nn.Linear(channels, channels)
 
         self.rescale_output_factor = rescale_output_factor
-        self.o_proj = nn.Linear(channels, channels)
+        # self.o_proj = nn.Linear(channels, channels)
+        self.o_proj = nn.Sequential(
+            nn.Linear(channels, channels),
+            nn.Dropout(p=dropout),
+            nn.LayerNorm(channels),
+        )  # dropout and layer norm
 
         self.query_chunk_size = query_chunk_size
         self.key_chunk_size = key_chunk_size
