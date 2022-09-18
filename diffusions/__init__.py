@@ -1,4 +1,4 @@
-from . import losses, models, pipelines, schedulers, utils
+from . import losses, lr_schedulers, models, pipelines, schedulers, utils
 
 __version__ = "0.1.12"
 
@@ -9,4 +9,5 @@ __all__ = [
     "pipelines",
     "schedulers",
     "utils",
+    "lr_schedulers",
 ]
