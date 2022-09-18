@@ -1,6 +1,6 @@
 from . import losses, lr_schedulers, models, pipelines, schedulers, utils
 
-__version__ = "0.1.12"
+__version__ = "0.1.13"
 
 __all__ = [
     "__version__",
