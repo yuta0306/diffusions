@@ -1,9 +1,10 @@
-from . import models, pipelines, schedulers, utils
+from . import losses, models, pipelines, schedulers, utils
 
-__version__ = "0.1.11"
+__version__ = "0.1.12"
 
 __all__ = [
     "__version__",
+    "losses",
     "models",
     "pipelines",
     "schedulers",
