@@ -28,7 +28,6 @@ class CosineAnnealingLR(_LRScheduler):
 
     def get_lr(self):
         if self.last_epoch < self.T_warmup:
-            print("warmup")
             return [
                 self.eta_min
                 + (base_lr - self.eta_min) * (self.last_epoch / self.T_warmup)
@@ -36,7 +35,6 @@ class CosineAnnealingLR(_LRScheduler):
             ]
 
         self.cos_anneal.step()
-        print("cos stepped")
         return self.cos_anneal.get_lr()
 
 
